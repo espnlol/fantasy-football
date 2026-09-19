@@ -63,12 +63,17 @@ export async function getRosterPlayer(gsisId: string, season: number): Promise<P
   return row ? toCandidate(row) : null;
 }
 
-export async function getRosterPlayerByEspnId(espnId: string, season: number): Promise<PlayerCandidate | null> {
+/** Every current-roster player at the given positions — used to decide what to precompute a static bundle for. */
+export async function listRosterPlayers(season: number, positions: string[]): Promise<PlayerCandidate[]> {
+  const wanted = new Set(positions);
   const latest = await latestRosterSnapshot(season);
+  const results: PlayerCandidate[] = [];
   for (const row of latest.values()) {
-    if (row.espn_id === espnId) return toCandidate(row);
+    if (!wanted.has(row.position)) continue;
+    results.push(toCandidate(row));
   }
-  return null;
+  results.sort((a, b) => a.team.localeCompare(b.team) || a.name.localeCompare(b.name));
+  return results;
 }
 
 export interface Crosswalk {

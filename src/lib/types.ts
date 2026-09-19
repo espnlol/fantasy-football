@@ -171,15 +171,7 @@ export type MatchupResult = WrMatchup | RbMatchup | ByeResult;
 export interface MetaResponse {
   season: number;
   week: number;
-  dataFetchedAt: number;
-  dataStale: boolean;
+  generatedAt: string;
   coordinators: { asOf: string; confidence: string; note: string };
-}
-
-export interface EspnRosterPlayer {
-  espnId: string;
-  fullName: string;
-  position: string;
-  proTeamId: number;
-  lineupSlotId: number;
+  playerCount: number;
 }

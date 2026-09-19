@@ -33,110 +33,72 @@ the closest honest substitute and says so explicitly, both in the app's
 
 ## Running it
 
+This is a fully static site — a precompute step writes plain JSON files, and
+the app just reads them. No server, no database, no API keys.
+
 ```bash
-npm install        # also installs server/ (postinstall)
-npm run dev         # client on :5173 (proxies /api to the server), server on :8787
-npm run build        # typecheck + production client build to dist/
+npm install
+npm run generate-data   # fetches nflverse data and writes public/data/*.json — takes a minute or two
+npm run dev              # http://localhost:5173
+npm run build              # typecheck + production build to dist/
 npm run typecheck
 ```
 
-No API keys or accounts are required for the core matchup analysis — it pulls
-directly from nflverse's public data on every cold request and caches it to
-`server/.cache/` (gitignored) with a several-hour TTL. Use the **Refresh
-data** button in the header to force a re-pull mid-session.
+Run `generate-data` once before your first `npm run dev`, and again whenever
+you want fresher numbers — `dev`/`build` just serve whatever's already in
+`public/data/` (gitignored; it's generated, not committed).
 
-## Deploying
+## Deploying — GitHub Pages, kept current automatically
 
-This is a two-piece app (a static React frontend + a stateful Node API), so
-"deploy it" means picking one of two shapes:
+`.github/workflows/deploy.yml` runs `generate-data` + `build` and deploys the
+result to GitHub Pages, on every push to `main`, on a daily schedule, and via
+a manual "Run workflow" button. That's what keeps the "data generated"
+timestamp in the header current through the season without anyone needing to
+touch this repo.
 
-### Option A — one host, one process (simplest if the host supports it)
+**One-time setup this repo needs from you:** Settings → Pages → Source →
+**GitHub Actions**. That's it — the workflow handles everything else,
+including enabling and updating the deployment itself. I can't flip that
+toggle myself (no tool has access to a repo's settings), and it's the kind of
+thing that should require an explicit human decision on a repo anyway.
 
-`cd server && npm run build && npm start` serves the built client *and* the
-API from a single Node process on `$PORT`. Run `npm run build` at the repo
-root first so `dist/` exists for it to serve. This is the right shape for
-any host that runs a persistent Node process — a VPS, Railway, Render, Fly.io,
-etc. — but **not Vercel**: its serverless functions are ephemeral and don't
-support what this server does on startup (see the note below), so this
-option doesn't apply there.
+Once that's set, your link is `https://<owner>.github.io/fantasy-football/`.
 
-### Option B — split: frontend on Vercel, backend on Railway/Render
+### Why static, and why not the live-server version this started as
 
-This is the shape to use if you specifically want a Vercel link. The backend
-needs a host that runs a normal long-lived Node process — Railway and Render
-both do this on their free tiers; Vercel's serverless functions do not (more
-on why below).
+The first version of this had a small Express backend: it downloaded several
+seasons of play-by-play on startup, decompressed and aggregated them into an
+in-memory weekly-stats table, and served matchup requests live. That's a
+fine shape for a host that runs a persistent process (Railway, Render, a
+VPS), but there was no such host available to deploy it to from where this
+was built — and a live server is also just more than a single-user fantasy
+tool needs. Since none of the underlying numbers change more than once a
+day (stats only update after games are played), precomputing them and
+serving flat files is a strict simplification: no server to keep running,
+no cold starts, nothing to pay for. `pipeline/` still holds the exact same
+analysis code the live version used — only how and when it runs changed.
 
-1. **Backend, on Railway or Render:** create a new web service from this
-   repo, with:
-   - Root/base directory: `server`
-   - Build command: `npm install && npm run build`
-   - Start command: `npm start`
-   - No environment variables are required to start. `PORT` is provided by
-     the platform automatically.
-   - Note the public URL it gives you (e.g. `https://your-app.up.railway.app`).
-2. **Frontend, on Vercel:** import this repo as a new project, with:
-   - Root directory: the repo root (leave as-is)
-   - Framework preset: Vite (auto-detected; `vercel.json` also pins this)
-   - Add an environment variable `VITE_API_BASE_URL` set to the backend URL
-     from step 1 (no trailing slash) — see `.env.example`.
-   - Deploy. You'll get your `*.vercel.app` link from this step.
-3. **Optional hardening:** back on the backend host, set a `CORS_ORIGIN` env
-   var to your Vercel URL from step 2 and redeploy — this locks the API to
-   only answer that origin instead of any origin. See `server/.env.example`.
-
-I can't run either of these steps myself: this project was built in a
-sandbox whose network policy blocks Vercel, Railway, Render, Fly.io, and
-Netlify outright (not something specific to one provider), and account
-linking has to happen on your end regardless, credentials-wise. Everything
-above is prepared and tested locally — CORS, the configurable API base URL,
-the build commands — so it's just clicking through the two dashboards.
-
-**Why not put the backend on Vercel too?** On startup (and whenever you hit
-**Refresh data**), the backend downloads several seasons of play-by-play,
-decompresses, and aggregates them into an in-memory weekly stats table — a
-one-time job that takes way longer than a serverless function is allowed to
-run, and produces state (that in-memory table, the on-disk cache) that a
-stateless, ephemeral function can't retain between requests anyway. It's
-written to not block other requests while that runs (see
-`server/src/lib/datasets.ts`), which only makes sense for a process that
-stays alive.
-
-**Cold starts:** on either option, the first request after a fresh deploy or
-a spun-down free-tier instance waking back up will lag behind the
-`[startup] weekly player stats warmed` log line while that aggregation
-finishes in the background — expect roughly a minute the very first time,
-much less once `server/.cache/` is warm (if the host's disk persists across
-restarts; Railway's does by default, plan-dependent on Render).
-
-### Optional: connect your ESPN league
-
-The dashboard's roster is manual-add by default (search, click, done —
-persisted in your browser's local storage, never sent anywhere but this app's
-own server). There's also a best-effort ESPN import: enter your league ID and
-team ID (and, for a private league, your `espn_s2`/`SWID` session cookies) and
-it fetches your roster server-side, so private-league cookies never touch
-your browser's network tab. **This could not be tested against a real ESPN
-league** while building it — the sandbox this was built in blocks network
-access to espn.com entirely — so treat it as unverified until you've tried it
-against your own league. Manual search always works and is the better-tested
-path.
+One real trade-off: only players who were on an active NFL roster the last
+time `generate-data` ran are searchable, and only for their actual upcoming
+opponent that week. There's also no ESPN league import in this version —
+that needs a server to call ESPN's API from (browsers can't call it
+directly; ESPN's API doesn't allow cross-origin requests). Add players by
+search instead; it's the better-tested path anyway.
 
 ## Architecture
 
 ```
 src/                    React 18 + TypeScript + Vite + Tailwind client
-  lib/                   API client, shared types, localStorage roster persistence
-  components/             PlayerSearch, MatchupCard (the main event), EspnConnect, ui primitives
+  lib/                   Static-JSON API client, shared types, localStorage roster persistence
+  components/             PlayerSearch, MatchupCard (the main event), ui primitives
   pages/                  DashboardPage, MethodologyPage
-server/
-  src/
-    lib/                   nflverse data fetch+cache, CSV parsing, player search/ID crosswalks
-    matchup/                one module per signal (coverage, pass rush, O-line tier, opponent-allowed,
+pipeline/
+  lib/                     nflverse data fetch+cache, CSV parsing, player search/ID crosswalks
+  matchup/                  one module per signal (coverage, pass rush, O-line tier, opponent-allowed,
                              career history, coordinators) + util.ts's transparent percentile/composite scoring
-    espn.ts                 best-effort ESPN Fantasy API proxy
-    routes.ts, index.ts      Express app
-  config/coordinators.json   the defensive-coordinator list described below
+  generate-data.ts           writes public/data/{meta,players}.json + public/data/matchups/<gsisId>.json
+  config/coordinators.json    the defensive-coordinator list described below
+.github/workflows/deploy.yml  generate-data + build + deploy to GitHub Pages, on push/schedule/manual trigger
 ```
 
 ## Data sources & attribution
@@ -162,7 +124,7 @@ release (the `pbp` tag), which **is** updated same-day. Fantasy points are
 computed as standard full-PPR from that box score; your league's exact
 scoring settings (0.5 PPR, TE premium, return TDs, fumble/2-point rules) may
 differ slightly. If nflverse's own file starts updating again, swapping back
-would simplify `server/src/lib/datasets.ts`, but there's no need to wait on
+would simplify `pipeline/lib/datasets.ts`, but there's no need to wait on
 that.
 
 ### Cornerback matchups — what this is and isn't
@@ -192,7 +154,7 @@ against O-lines that graded into the same tier as the matchup being viewed.
 
 Each opponent's current DC is shown next to the QB-vs-defense history, for
 context (e.g. "this history is against a totally different coordinator").
-`server/config/coordinators.json` was assembled from web search rather than a
+`pipeline/config/coordinators.json` was assembled from web search rather than a
 structured feed — Wikipedia and team sites were both unreachable from the
 build environment — and has **not** been checked against a primary source.
 Two entries that came back contradictory (the same person credited to two
@@ -212,8 +174,13 @@ falling back to the depth chart only before Week 1 snap data exists.
 
 ## Known limitations
 
-- WR and RB only. QB/TE roster entries are shown but not analyzed — the
-  request this was built for was specifically about receivers and backs.
+- WR and RB only — search doesn't return QBs, TEs, or any other position,
+  since the request this was built for was specifically about receivers and
+  backs and there's nothing precomputed for them to show.
+- Static snapshot, not live: a player is only searchable if they were on an
+  active roster the last time `generate-data` ran, and their matchup is
+  fixed to whatever their opponent was that same week. A trade, signing, or
+  bye-week rollover won't show up until the next scheduled regeneration.
 - Early in a season, "this season" splits can be a 1-2 game sample. Every
   such stat shows its game count; the UI surfaces last season's full-sample
   numbers right alongside it for exactly this reason.

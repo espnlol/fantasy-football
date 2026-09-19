@@ -3,34 +3,28 @@ import { api } from './lib/api';
 import type { MetaResponse } from './lib/types';
 import { DashboardPage } from './pages/DashboardPage';
 import { MethodologyPage } from './pages/MethodologyPage';
-import { Spinner } from './components/ui';
 
 type Tab = 'dashboard' | 'methodology';
+
+function formatGeneratedAt(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const hours = Math.round(diffMs / (60 * 60 * 1000));
+  if (hours < 1) return 'less than an hour ago';
+  if (hours < 48) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
   const [meta, setMeta] = useState<MetaResponse | null>(null);
   const [metaError, setMetaError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
 
-  function loadMeta() {
+  useEffect(() => {
     api
       .meta()
       .then(setMeta)
       .catch((err) => setMetaError(err.message));
-  }
-
-  useEffect(loadMeta, []);
-
-  async function handleRefresh() {
-    setRefreshing(true);
-    try {
-      await api.refresh();
-      loadMeta();
-    } finally {
-      setRefreshing(false);
-    }
-  }
+  }, []);
 
   return (
     <div className="min-h-screen">
@@ -41,8 +35,7 @@ export default function App() {
             <p className="text-xs text-slate-500">
               {meta ? (
                 <>
-                  {meta.season} season · Week {meta.week}
-                  {meta.dataStale && <span className="ml-1 text-amber-600 dark:text-amber-400">(showing cached data)</span>}
+                  {meta.season} season · Week {meta.week} · data generated {formatGeneratedAt(meta.generatedAt)}
                 </>
               ) : metaError ? (
                 <span className="text-red-600">{metaError}</span>
@@ -73,19 +66,11 @@ export default function App() {
               Methodology
             </button>
           </nav>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-          >
-            {refreshing && <Spinner />}
-            Refresh data
-          </button>
         </div>
       </header>
 
       <main className="mx-auto max-w-4xl px-4 py-6">
-        {tab === 'dashboard' ? <DashboardPage meta={meta} /> : <MethodologyPage meta={meta} />}
+        {tab === 'dashboard' ? <DashboardPage /> : <MethodologyPage meta={meta} />}
       </main>
 
       <footer className="mx-auto max-w-4xl px-4 pb-8 pt-2 text-center text-xs text-slate-400">

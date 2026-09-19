@@ -86,14 +86,19 @@ export function MethodologyPage({ meta }: { meta: MetaResponse | null }) {
       </Card>
 
       <Card className="p-6">
-        <SectionLabel>ESPN league import</SectionLabel>
+        <SectionLabel>How this site works</SectionLabel>
         <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-          Importing your roster from ESPN calls ESPN's own (undocumented) fantasy API from this app's server, so a
-          private league's cookies never reach your browser's network tab. That call could not be tested against a
-          real league while building this, because this environment's network policy blocks espn.com outright. It
-          follows the request shape the fantasy-tooling community has reverse-engineered over the years, but
-          verify it works for your league before relying on it — manual search is always available as a fallback
-          and is the better-tested path.
+          This is a fully static site — no backend, nothing running on a server for your requests. Every
+          player's matchup report is precomputed ahead of time (see <code>pipeline/generate-data.ts</code>) and
+          shipped as plain JSON files; the app just reads them. A GitHub Actions workflow re-runs that
+          precomputation on a schedule and redeploys automatically, which is what keeps the "data generated"
+          timestamp in the header current through the season.
+        </p>
+        <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          One consequence: only players who were on an active NFL roster the last time the data was generated are
+          searchable, and only for their actual upcoming opponent that week — not a database of every matchup
+          that ever was. There's also no ESPN league import in this version (that needs a server to call ESPN's
+          API from, which a static site doesn't have); add your players by search instead.
         </p>
       </Card>
 

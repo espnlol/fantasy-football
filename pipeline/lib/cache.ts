@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const CACHE_DIR = path.join(__dirname, '..', '..', '.cache');
+const CACHE_DIR = path.join(__dirname, '..', '.cache');
 
 function keyToFile(key: string): string {
   const safe = key.replace(/[^a-z0-9._-]+/gi, '_');

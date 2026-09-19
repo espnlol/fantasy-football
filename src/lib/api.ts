@@ -1,38 +1,46 @@
-import type { PlayerCandidate, MatchupResult, MetaResponse, EspnRosterPlayer } from './types';
+import type { PlayerCandidate, MatchupResult, MetaResponse } from './types';
 
 /**
- * Empty in local dev (Vite's dev-server proxy forwards same-origin /api to the Express server — see
- * vite.config.ts). Set VITE_API_BASE_URL when the frontend and backend are deployed as separate services
- * (e.g. frontend on Vercel, backend on Railway/Render) with no shared origin to proxy through.
+ * This is a fully static site — there's no backend. Everything under public/data/ is precomputed by
+ * pipeline/generate-data.ts (run locally, or by the GitHub Actions workflow on a schedule) and just served as
+ * plain files. import.meta.env.BASE_URL reflects Vite's `base` config, so this resolves correctly both in local
+ * dev (served from /) and on GitHub Pages (served from /fantasy-football/).
  */
-const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+const DATA_BASE = `${import.meta.env.BASE_URL}data`;
 
-async function asJson<T>(res: Response): Promise<T> {
+async function getJson<T>(url: string): Promise<T> {
+  const res = await fetch(url);
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}) as { error?: string; note?: string });
-    const message = [body.error, body.note].filter(Boolean).join(' ') || `Request failed (HTTP ${res.status}).`;
-    throw new Error(message);
+    throw new Error(
+      res.status === 404
+        ? "No precomputed data for this — it may not be on an active NFL roster, or data hasn't been generated yet."
+        : `Failed to load ${url} (HTTP ${res.status}).`,
+    );
   }
   return res.json() as Promise<T>;
 }
 
+let playersIndexPromise: Promise<PlayerCandidate[]> | null = null;
+function loadPlayersIndex(): Promise<PlayerCandidate[]> {
+  if (!playersIndexPromise) {
+    playersIndexPromise = getJson<PlayerCandidate[]>(`${DATA_BASE}/players.json`);
+  }
+  return playersIndexPromise;
+}
+
 export const api = {
-  meta: () => fetch(`${API_BASE}/api/meta`).then((r) => asJson<MetaResponse>(r)),
+  meta: () => getJson<MetaResponse>(`${DATA_BASE}/meta.json`),
 
-  searchPlayers: (q: string) =>
-    fetch(`${API_BASE}/api/players/search?q=${encodeURIComponent(q)}`).then((r) => asJson<{ results: PlayerCandidate[] }>(r)),
+  searchPlayers: async (q: string): Promise<{ results: PlayerCandidate[] }> => {
+    const query = q.trim().toLowerCase();
+    if (query.length < 2) return { results: [] };
+    const all = await loadPlayersIndex();
+    const results = all
+      .filter((p) => p.name.toLowerCase().includes(query))
+      .sort((a, b) => a.name.toLowerCase().indexOf(query) - b.name.toLowerCase().indexOf(query) || a.name.localeCompare(b.name))
+      .slice(0, 25);
+    return { results };
+  },
 
-  playerByEspnId: (espnId: string) =>
-    fetch(`${API_BASE}/api/players/by-espn/${encodeURIComponent(espnId)}`).then((r) => asJson<{ player: PlayerCandidate }>(r)),
-
-  matchup: (gsisId: string) => fetch(`${API_BASE}/api/matchup/${gsisId}`).then((r) => asJson<MatchupResult>(r)),
-
-  refresh: () => fetch(`${API_BASE}/api/refresh`, { method: 'POST' }).then((r) => asJson<{ ok: boolean }>(r)),
-
-  espnRoster: (payload: { leagueId: string; season: number; teamId: number; espnS2?: string; swid?: string }) =>
-    fetch(`${API_BASE}/api/espn/roster`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    }).then((r) => asJson<{ roster: EspnRosterPlayer[] }>(r)),
+  matchup: (gsisId: string) => getJson<MatchupResult>(`${DATA_BASE}/matchups/${gsisId}.json`),
 };

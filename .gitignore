@@ -6,8 +6,5 @@ dist-ssr
 npm-debug.log*
 .vite
 *.tsbuildinfo
-server/.cache
-server/dist
-.env
-.env.local
-server/.env
+pipeline/.cache
+public/data

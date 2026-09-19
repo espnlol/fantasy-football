@@ -11,7 +11,7 @@ let cached: CoordinatorsConfig | null = null;
 
 function load(): CoordinatorsConfig {
   if (cached) return cached;
-  const file = path.join(__dirname, '..', '..', 'config', 'coordinators.json');
+  const file = path.join(__dirname, '..', 'config', 'coordinators.json');
   cached = JSON.parse(fs.readFileSync(file, 'utf8')) as CoordinatorsConfig;
   return cached;
 }
