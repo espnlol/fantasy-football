@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Datasets, currentSeason, currentWeek, opponentFor } from './lib/datasets';
 import { listRosterPlayers } from './lib/players';
+import { buildSleeperCrosswalk } from './lib/sleeper';
 import { analyzeWr } from './matchup/wr';
 import { analyzeRb } from './matchup/rb';
 import { coordinatorsMeta } from './matchup/coordinators';
@@ -27,6 +28,9 @@ async function main(): Promise<void> {
   console.log(`${players.length} WR/RB on current active rosters.`);
 
   fs.writeFileSync(path.join(OUT_DIR, 'players.json'), JSON.stringify(players));
+
+  // Independent of the per-player matchup loop below, so kick it off now and only await it once that's done.
+  const sleeperCrosswalkPromise = buildSleeperCrosswalk(players);
 
   let ok = 0;
   let byes = 0;
@@ -55,6 +59,9 @@ async function main(): Promise<void> {
     }
   }
   process.stdout.write('\n');
+
+  const sleeperCrosswalk = await sleeperCrosswalkPromise;
+  fs.writeFileSync(path.join(OUT_DIR, 'sleeper-index.json'), JSON.stringify(sleeperCrosswalk));
 
   const meta = {
     season,

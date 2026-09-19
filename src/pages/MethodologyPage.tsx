@@ -97,8 +97,25 @@ export function MethodologyPage({ meta }: { meta: MetaResponse | null }) {
         <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
           One consequence: only players who were on an active NFL roster the last time the data was generated are
           searchable, and only for their actual upcoming opponent that week — not a database of every matchup
-          that ever was. There's also no ESPN league import in this version (that needs a server to call ESPN's
-          API from, which a static site doesn't have); add your players by search instead.
+          that ever was.
+        </p>
+      </Card>
+
+      <Card className="p-6">
+        <SectionLabel>Sleeper import</SectionLabel>
+        <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          Unlike ESPN, Sleeper's API is genuinely public — reading a username's leagues and rosters needs no
+          login or cookies, so this calls it directly from your browser with no server in between. It also fetches
+          your Sleeper roster live, at the moment you import, rather than from a periodic snapshot; matching each
+          player back to this site's own data (to know who they play this week) uses a small ID crosswalk built
+          the same way the rest of this site's data is — precomputed ahead of time, not looked up live.
+        </p>
+        <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          One honesty note: Sleeper's API was unreachable from the sandbox this was built in — the same network
+          restriction that shaped the hosting choice this site ended up with — so this integration is built from
+          Sleeper's long-standing, widely-documented public API shape rather than tested end to end against a
+          real account before shipping. If an import doesn't work for your league, manual search is unaffected
+          and always available.
         </p>
       </Card>
 

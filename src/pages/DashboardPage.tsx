@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import type { PlayerCandidate } from '../lib/types';
+import type { MetaResponse, PlayerCandidate } from '../lib/types';
 import { loadRoster, saveRoster } from '../lib/storage';
 import { PlayerSearch } from '../components/PlayerSearch';
+import { SleeperConnect } from '../components/SleeperConnect';
 import { MatchupCard } from '../components/MatchupCard';
 import { Card } from '../components/ui';
 
-export function DashboardPage() {
+export function DashboardPage({ meta }: { meta: MetaResponse | null }) {
   const [roster, setRoster] = useState<PlayerCandidate[]>([]);
 
   useEffect(() => {
@@ -16,6 +17,17 @@ export function DashboardPage() {
     setRoster((prev) => {
       if (prev.some((x) => x.gsisId === p.gsisId)) return prev;
       const next = [...prev, p];
+      saveRoster(next);
+      return next;
+    });
+  }
+
+  function addPlayers(players: PlayerCandidate[]) {
+    setRoster((prev) => {
+      const existing = new Set(prev.map((x) => x.gsisId));
+      const additions = players.filter((p) => !existing.has(p.gsisId));
+      if (additions.length === 0) return prev;
+      const next = [...prev, ...additions];
       saveRoster(next);
       return next;
     });
@@ -38,6 +50,8 @@ export function DashboardPage() {
         </p>
         <PlayerSearch onAdd={addPlayer} />
       </Card>
+
+      <SleeperConnect season={meta?.season ?? new Date().getFullYear()} onImport={addPlayers} />
 
       {roster.length === 0 ? (
         <Card className="p-8 text-center text-sm text-slate-500">

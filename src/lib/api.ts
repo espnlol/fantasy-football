@@ -28,6 +28,8 @@ function loadPlayersIndex(): Promise<PlayerCandidate[]> {
   return playersIndexPromise;
 }
 
+let sleeperIndexPromise: Promise<Record<string, string>> | null = null;
+
 export const api = {
   meta: () => getJson<MetaResponse>(`${DATA_BASE}/meta.json`),
 
@@ -43,4 +45,13 @@ export const api = {
   },
 
   matchup: (gsisId: string) => getJson<MatchupResult>(`${DATA_BASE}/matchups/${gsisId}.json`),
+
+  /** Every tracked WR/RB, for resolving an external roster (e.g. Sleeper) to our player records. */
+  allPlayers: () => loadPlayersIndex(),
+
+  /** { sleeperPlayerId: gsisId }, precomputed at build time — see pipeline/lib/sleeper.ts. */
+  sleeperIndex: (): Promise<Record<string, string>> => {
+    if (!sleeperIndexPromise) sleeperIndexPromise = getJson<Record<string, string>>(`${DATA_BASE}/sleeper-index.json`);
+    return sleeperIndexPromise;
+  },
 };

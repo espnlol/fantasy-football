@@ -80,23 +80,41 @@ analysis code the live version used — only how and when it runs changed.
 
 One real trade-off: only players who were on an active NFL roster the last
 time `generate-data` ran are searchable, and only for their actual upcoming
-opponent that week. There's also no ESPN league import in this version —
-that needs a server to call ESPN's API from (browsers can't call it
-directly; ESPN's API doesn't allow cross-origin requests). Add players by
-search instead; it's the better-tested path anyway.
+opponent that week. There's also no ESPN league import — that needs a
+server to call ESPN's API from (browsers can't call it directly; ESPN's
+API doesn't allow cross-origin requests), which a static site doesn't
+have. Sleeper's API is public, so that one works directly from the browser
+instead — see below.
+
+### Importing a roster from Sleeper
+
+The dashboard can pull a roster straight from Sleeper by username: enter
+it, pick which of that account's leagues, and it adds every WR/RB on that
+team. This calls Sleeper's public API directly from the browser (no
+login, no cookies, no server) and matches players back to this site's own
+data via a small ID crosswalk built at data-generation time
+(`pipeline/lib/sleeper.ts`) — Sleeper's own multi-thousand-player dump
+never has to touch the client.
+
+Sleeper's API was unreachable from the sandbox this was built in (the same
+restriction that shaped the hosting decision above), so unlike everything
+else in this project, this integration could not be tested against a real
+account before shipping — it's built from Sleeper's public, long-stable
+API shape, not verified live. Manual search is unaffected either way.
 
 ## Architecture
 
 ```
 src/                    React 18 + TypeScript + Vite + Tailwind client
   lib/                   Static-JSON API client, shared types, localStorage roster persistence
-  components/             PlayerSearch, MatchupCard (the main event), ui primitives
+  components/             PlayerSearch, SleeperConnect, MatchupCard (the main event), ui primitives
   pages/                  DashboardPage, MethodologyPage
 pipeline/
   lib/                     nflverse data fetch+cache, CSV parsing, player search/ID crosswalks
+  lib/sleeper.ts            builds the Sleeper-id → gsis-id crosswalk (public/data/sleeper-index.json)
   matchup/                  one module per signal (coverage, pass rush, O-line tier, opponent-allowed,
                              career history, coordinators) + util.ts's transparent percentile/composite scoring
-  generate-data.ts           writes public/data/{meta,players}.json + public/data/matchups/<gsisId>.json
+  generate-data.ts           writes public/data/{meta,players,sleeper-index}.json + public/data/matchups/<gsisId>.json
   config/coordinators.json    the defensive-coordinator list described below
 .github/workflows/deploy.yml  generate-data + build + deploy to GitHub Pages, on push/schedule/manual trigger
 ```
@@ -108,8 +126,10 @@ pipeline/
   community-maintained NFL data project released under **CC-BY 4.0**.
 - Cornerback coverage and pass-rush stats come from **Pro Football
   Reference's** advanced stats, redistributed via nflverse.
-- This project is not affiliated with the NFL, ESPN, PFF, or Pro Football
-  Reference.
+- League/roster import uses [Sleeper's](https://docs.sleeper.com/) public
+  read API.
+- This project is not affiliated with the NFL, ESPN, PFF, Pro Football
+  Reference, or Sleeper.
 
 ### Why weekly stats are computed from play-by-play, not nflverse's own "player_stats" file
 
@@ -181,6 +201,13 @@ falling back to the depth chart only before Week 1 snap data exists.
   active roster the last time `generate-data` ran, and their matchup is
   fixed to whatever their opponent was that same week. A trade, signing, or
   bye-week rollover won't show up until the next scheduled regeneration.
+  Sleeper import fetches your actual roster live, but can still only add
+  the WR/RB on it that match this same precomputed snapshot — everything
+  else on your Sleeper team (QB, TE, K, DEF, or a genuinely unmatched
+  player) is silently skipped, with a count shown after import.
+- The Sleeper integration itself is unverified end to end (see
+  "Importing a roster from Sleeper" above) — it's built from Sleeper's
+  documented API shape, not tested against a real account before shipping.
 - Early in a season, "this season" splits can be a 1-2 game sample. Every
   such stat shows its game count; the UI surfaces last season's full-sample
   numbers right alongside it for exactly this reason.

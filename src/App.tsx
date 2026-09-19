@@ -70,11 +70,12 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-4xl px-4 py-6">
-        {tab === 'dashboard' ? <DashboardPage /> : <MethodologyPage meta={meta} />}
+        {tab === 'dashboard' ? <DashboardPage meta={meta} /> : <MethodologyPage meta={meta} />}
       </main>
 
       <footer className="mx-auto max-w-4xl px-4 pb-8 pt-2 text-center text-xs text-slate-400">
-        Data via nflverse (CC-BY 4.0) and Pro Football Reference. Not affiliated with the NFL, ESPN, or PFF.
+        Data via nflverse (CC-BY 4.0) and Pro Football Reference. Not affiliated with the NFL, ESPN, PFF, or
+        Sleeper.
       </footer>
     </div>
   );
