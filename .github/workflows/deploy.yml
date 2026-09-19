@@ -42,8 +42,10 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:
-          # Pages has never been turned on for this repo; without this the action only reads the existing
-          # config (404s) instead of creating it. Needs nothing beyond the pages: write permission above.
+          # Doesn't fully self-serve, verified: creating a Pages site the first time needs repo-admin rights
+          # that a workflow token can't hold even with pages: write ("Resource not accessible by integration").
+          # Harmless to leave true, though — it only matters on the very first run, before a human enables
+          # Pages once via Settings → Pages → Source → GitHub Actions.
           enablement: true
 
       - name: Upload artifact
