@@ -257,6 +257,10 @@ export const Datasets = {
     loadCsv(`${BASE}/pfr_advstats/advstats_week_pass_${season}.csv`, `advpass_week_${season}`, 6 * HOUR, force),
   advSeasonRush: (force = false) =>
     loadCsv(`${BASE}/pfr_advstats/advstats_season_rush.csv`, 'advrush_season', 6 * HOUR, force),
+  /** Official weekly injury reports (practice participation + game status), keyed by gsis_id. Updates through
+   * the week as new practice reports come in, so this uses a shorter TTL than most other datasets here. */
+  injuries: (season: number, force = false) =>
+    loadCsv(`${BASE}/injuries/injuries_${season}.csv`, `injuries_${season}`, 2 * HOUR, force),
 };
 
 export function clearMemCache(): void {

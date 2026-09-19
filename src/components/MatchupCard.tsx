@@ -1,7 +1,20 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
-import type { GameLine, MatchupResult, PlayerCandidate, RbMatchup, ScoreComponent, WrMatchup } from '../lib/types';
+import type {
+  GameLine,
+  InjuryStatus,
+  MatchupResult,
+  PlayerCandidate,
+  QbMatchup,
+  RbMatchup,
+  ScoreComponent,
+  TeMatchup,
+  UsageTrend,
+  WrMatchup,
+} from '../lib/types';
 import { Card, LeanBadge, PercentileBar, SectionLabel, Spinner } from './ui';
+
+const SUPPORTED_POSITIONS = ['WR', 'RB', 'QB', 'TE'];
 
 function ComponentRow({ c }: { c: ScoreComponent }) {
   return (
@@ -27,8 +40,9 @@ function HistoryTable({ games }: { games: GameLine[] }) {
             <th className="py-1 pr-3 font-medium">Wk</th>
             <th className="py-1 pr-3 font-medium">Receiving</th>
             <th className="py-1 pr-3 font-medium">Rushing</th>
+            <th className="py-1 pr-3 font-medium">Passing</th>
             <th className="py-1 pr-3 font-medium">TD</th>
-            <th className="py-1 pr-3 font-medium">PPR</th>
+            <th className="py-1 pr-3 font-medium">Pts</th>
           </tr>
         </thead>
         <tbody>
@@ -37,12 +51,13 @@ function HistoryTable({ games }: { games: GameLine[] }) {
               <td className="py-1.5 pr-3">{g.season}</td>
               <td className="py-1.5 pr-3">{g.week}</td>
               <td className="py-1.5 pr-3">
-                {g.statline.receptions}/{g.statline.targets}, {g.statline.recYards} yd
+                {g.statline.targets > 0 ? `${g.statline.receptions}/${g.statline.targets}, ${g.statline.recYards} yd` : '—'}
               </td>
               <td className="py-1.5 pr-3">
                 {g.statline.carries > 0 ? `${g.statline.carries} car, ${g.statline.rushYards} yd` : '—'}
               </td>
-              <td className="py-1.5 pr-3">{g.statline.recTd + g.statline.rushTd}</td>
+              <td className="py-1.5 pr-3">{g.statline.passYards > 0 ? `${g.statline.passYards} yd, ${g.statline.passTd} TD, ${g.statline.interceptions} INT` : '—'}</td>
+              <td className="py-1.5 pr-3">{g.statline.recTd + g.statline.rushTd + g.statline.passTd}</td>
               <td className="py-1.5 pr-3 font-semibold text-slate-700 dark:text-slate-200">{g.pprPoints.toFixed(1)}</td>
             </tr>
           ))}
@@ -79,6 +94,42 @@ function PlayerAvatar({ player }: { player: PlayerCandidate }) {
   );
 }
 
+const INJURY_STYLES: Record<string, string> = {
+  Out: 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/30 dark:border-red-800 dark:text-red-200',
+  Doubtful: 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/30 dark:border-red-800 dark:text-red-200',
+  Questionable: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/30 dark:border-amber-800 dark:text-amber-200',
+};
+
+function InjuryBanner({ injury }: { injury: InjuryStatus | null }) {
+  if (!injury || injury.status === 'Healthy') return null;
+  return (
+    <div className={`rounded-lg border px-3 py-2 text-sm font-medium ${INJURY_STYLES[injury.status] ?? INJURY_STYLES.Questionable}`}>
+      {injury.status}
+      {injury.primaryInjury ? ` — ${injury.primaryInjury}` : ''}
+      <span className="ml-1.5 font-normal opacity-80">(week {injury.asOfWeek} injury report)</span>
+    </div>
+  );
+}
+
+function UsageTrendTag({ trend }: { trend: UsageTrend | null }) {
+  if (!trend || trend.totalGames < 3) return null;
+  const arrow = trend.trend === 'up' ? '↑' : trend.trend === 'down' ? '↓' : '→';
+  const color =
+    trend.trend === 'up'
+      ? 'text-field-700 dark:text-field-400'
+      : trend.trend === 'down'
+        ? 'text-red-600 dark:text-red-400'
+        : 'text-slate-500';
+  return (
+    <span
+      className={`text-xs font-medium ${color}`}
+      title={`Snap share: ${trend.recentAvgSnapPct}% over last ${trend.recentGames} gm vs ${trend.seasonAvgSnapPct}% season avg`}
+    >
+      {arrow} usage
+    </span>
+  );
+}
+
 export function MatchupCard({ player, onRemove }: { player: PlayerCandidate; onRemove: () => void }) {
   const [data, setData] = useState<MatchupResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -107,7 +158,7 @@ export function MatchupCard({ player, onRemove }: { player: PlayerCandidate; onR
   }, [player.gsisId]);
 
   const isBye = data && 'bye' in data && data.bye;
-  const supported = player.position === 'WR' || player.position === 'RB';
+  const supported = SUPPORTED_POSITIONS.includes(player.position);
 
   return (
     <Card className="p-5">
@@ -132,7 +183,7 @@ export function MatchupCard({ player, onRemove }: { player: PlayerCandidate; onR
       <div className="mt-4">
         {!supported && (
           <p className="text-sm text-slate-500">
-            Matchup analysis covers WR and RB for now — {player.position} isn't supported yet.
+            Matchup analysis covers WR, RB, QB, and TE — {player.position} isn't supported yet.
           </p>
         )}
         {supported && loading && (
@@ -143,7 +194,7 @@ export function MatchupCard({ player, onRemove }: { player: PlayerCandidate; onR
         {supported && error && <p className="text-sm text-red-600">{error}</p>}
         {supported && isBye && <p className="text-sm text-slate-500">Bye week {data!.week} — no game.</p>}
         {supported && data && !isBye && (
-          <MatchupBody data={data as WrMatchup | RbMatchup} expanded={expanded} setExpanded={setExpanded} />
+          <MatchupBody data={data as WrMatchup | RbMatchup | QbMatchup | TeMatchup} expanded={expanded} setExpanded={setExpanded} />
         )}
       </div>
     </Card>
@@ -155,18 +206,23 @@ function MatchupBody({
   expanded,
   setExpanded,
 }: {
-  data: WrMatchup | RbMatchup;
+  data: WrMatchup | RbMatchup | QbMatchup | TeMatchup;
   expanded: boolean;
   setExpanded: (v: boolean) => void;
 }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-slate-600 dark:text-slate-300">
-          Week {data.week} · {data.homeAway === 'home' ? 'vs' : '@'} <span className="font-semibold">{data.opponent}</span>
+        <p className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <span>
+            Week {data.week} · {data.homeAway === 'home' ? 'vs' : '@'} <span className="font-semibold">{data.opponent}</span>
+          </span>
+          <UsageTrendTag trend={data.usageTrend} />
         </p>
         <LeanBadge lean={data.recommendation.lean} score={data.recommendation.score} />
       </div>
+
+      <InjuryBanner injury={data.injuryStatus} />
 
       <button
         onClick={() => setExpanded(!expanded)}
@@ -193,9 +249,12 @@ function MatchupBody({
             <HistoryTable games={data.ownHistoryVsOpponent.games} />
           </div>
 
-          {data.position === 'WR' ? <WrExtras data={data} /> : <RbExtras data={data} />}
+          {data.position === 'WR' && <WrExtras data={data} />}
+          {data.position === 'RB' && <RbExtras data={data} />}
+          {data.position === 'QB' && <QbExtras data={data} />}
+          {data.position === 'TE' && <TeExtras data={data} />}
 
-          {data.qb && (
+          {data.position !== 'QB' && data.qb && (
             <div>
               <SectionLabel>
                 QB context — {data.qb.name} vs {data.opponent}
@@ -339,6 +398,134 @@ function RbExtras({ data }: { data: RbMatchup }) {
         <p className="mt-1.5 text-xs text-slate-400">
           "Pressure events" = pressures + hurries + hits + sacks (PFR via nflverse). The last column is this
           rusher's rate specifically in games against offensive lines rated the same tier as {data.player.team}'s.
+        </p>
+      </div>
+    </>
+  );
+}
+
+function QbExtras({ data }: { data: QbMatchup }) {
+  const { thisSeason, lastSeason, recentForm } = data.opponentPassDefenseAllowedToQb;
+  const { thisSeason: olineNow, lastSeason: olineLast } = data.myOline;
+  const tierNow = olineNow?.tier ?? 'Average';
+
+  return (
+    <>
+      <div>
+        <SectionLabel>{data.opponent} pass defense vs QB</SectionLabel>
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          {thisSeason
+            ? `This season: ${thisSeason.perGame.pprPoints} fantasy pts/gm allowed to QBs (${thisSeason.tier}), ${thisSeason.perGame.passYards} pass yd/gm, ${thisSeason.perGame.passTd} pass TD/gm, n=${thisSeason.games} gm.`
+            : 'No data yet this season.'}{' '}
+          {lastSeason && `Last season: ${lastSeason.perGame.pprPoints} pts/gm (${lastSeason.tier}).`}{' '}
+          {recentForm && `Last ${recentForm.games} gm: ${recentForm.pprPointsPerGame} pts/gm.`}
+        </p>
+      </div>
+      <div>
+        <SectionLabel>{data.player.team} O-line pass protection</SectionLabel>
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          {olineNow
+            ? `This season: ${olineNow.pressurePctAllowed}% pressure rate allowed (${olineNow.tier}).`
+            : 'No data yet.'}{' '}
+          {olineLast && `Last season: ${olineLast.pressurePctAllowed}% (${olineLast.tier}).`}
+        </p>
+        <p className="mt-1 text-xs text-slate-400">
+          Proxied from this QB's own pressure rate — there's no free per-lineman grade (that's PFF's paywalled
+          product). See Methodology.
+        </p>
+      </div>
+      <div>
+        <SectionLabel>{data.opponent}'s pass rush this season</SectionLabel>
+        {data.opponentPassRush.topRushers.length === 0 ? (
+          <p className="text-sm text-slate-500">No data yet this season.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="text-slate-400">
+                <tr>
+                  <th className="py-1 pr-3 font-medium">Rusher</th>
+                  <th className="py-1 pr-3 font-medium">Pressure events</th>
+                  <th className="py-1 pr-3 font-medium">Sacks</th>
+                  <th className="py-1 pr-3 font-medium">Season rate</th>
+                  <th className="py-1 pr-3 font-medium">vs {tierNow}-tier O-lines</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.opponentPassRush.topRushers.map((t) => {
+                  const vsTier = data.opponentPassRush.rushersVsMyTier.find((r) => r.name === t.name)?.vsThisTier;
+                  return (
+                    <tr key={t.pfrPlayerId} className="border-t border-slate-100 dark:border-slate-800">
+                      <td className="py-1.5 pr-3 font-medium">{t.name}</td>
+                      <td className="py-1.5 pr-3">{t.totalPressureEvents}</td>
+                      <td className="py-1.5 pr-3">{t.totalSacks}</td>
+                      <td className="py-1.5 pr-3">{t.pressureRatePct ?? '—'}%</td>
+                      <td className="py-1.5 pr-3">{vsTier ? `${vsTier.ratePct ?? '—'}% (n=${vsTier.games} gm)` : '—'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="mt-1.5 text-xs text-slate-400">
+          "Pressure events" = pressures + hurries + hits + sacks (PFR via nflverse) — the pressure this QB faces
+          directly.
+        </p>
+      </div>
+    </>
+  );
+}
+
+function TeExtras({ data }: { data: TeMatchup }) {
+  const { thisSeason, lastSeason, recentForm } = data.opponentPassDefenseAllowedToTe;
+  return (
+    <>
+      <div>
+        <SectionLabel>{data.opponent} pass defense vs TE</SectionLabel>
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          {thisSeason
+            ? `This season: ${thisSeason.perGame.pprPoints} PPR pts/gm allowed (${thisSeason.tier}, n=${thisSeason.games} gm).`
+            : 'No data yet this season.'}{' '}
+          {lastSeason && `Last season: ${lastSeason.perGame.pprPoints} pts/gm (${lastSeason.tier}).`}{' '}
+          {recentForm && `Last ${recentForm.games} gm: ${recentForm.pprPointsPerGame} pts/gm.`}
+        </p>
+      </div>
+      <div>
+        <SectionLabel>{data.opponent}'s coverage linebackers/safeties this season</SectionLabel>
+        {data.opponentCoverageDefenders.length === 0 ? (
+          <p className="text-sm text-slate-500">No coverage data yet this season.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="text-slate-400">
+                <tr>
+                  <th className="py-1 pr-3 font-medium">Defender</th>
+                  <th className="py-1 pr-3 font-medium">Tgt</th>
+                  <th className="py-1 pr-3 font-medium">Comp%</th>
+                  <th className="py-1 pr-3 font-medium">Yd/Tgt</th>
+                  <th className="py-1 pr-3 font-medium">TD</th>
+                  <th className="py-1 pr-3 font-medium">Rating allowed</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.opponentCoverageDefenders.map((c) => (
+                  <tr key={c.pfrPlayerId} className="border-t border-slate-100 dark:border-slate-800">
+                    <td className="py-1.5 pr-3 font-medium">{c.name}</td>
+                    <td className="py-1.5 pr-3">{c.targets}</td>
+                    <td className="py-1.5 pr-3">{c.completionPctAllowed ?? '—'}%</td>
+                    <td className="py-1.5 pr-3">{c.yardsPerTargetAllowed ?? '—'}</td>
+                    <td className="py-1.5 pr-3">{c.tdAllowed}</td>
+                    <td className="py-1.5 pr-3">{c.passerRatingAllowed ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="mt-1.5 text-xs text-slate-400">
+          Tight ends are usually covered by linebackers and safeties, not boundary corners — this is that group's
+          season coverage stats instead of the cornerback table WRs get. Season-long tendencies, not a
+          play-by-play "who covered whom." See Methodology.
         </p>
       </div>
     </>

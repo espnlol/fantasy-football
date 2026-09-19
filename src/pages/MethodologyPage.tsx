@@ -37,6 +37,10 @@ export function MethodologyPage({ meta }: { meta: MetaResponse | null }) {
             hits, sacks) come from Pro Football Reference's advanced stats, via nflverse.
           </li>
           <li>
+            Injury status comes from the NFL's own official weekly injury report (practice participation and
+            game designation), via nflverse — not a news feed or social media.
+          </li>
+          <li>
             Fantasy points are standard full-PPR, computed from the box score. Your league's actual scoring (0.5
             PPR, TE premium, return TDs, bonus thresholds) may differ slightly.
           </li>
@@ -65,6 +69,49 @@ export function MethodologyPage({ meta }: { meta: MetaResponse | null }) {
           line alone (scheme, quarterback mobility, play calling). Opposing pass rushers are shown individually
           (their real pressures/hurries/hits/sacks), along with their pressure rate specifically in games against
           offensive lines that graded out in the same tier as the matchup you're looking at.
+        </p>
+      </Card>
+
+      <Card className="p-6">
+        <SectionLabel>Injury status</SectionLabel>
+        <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          The banner on a player's card (Out / Doubtful / Questionable) and the matching line in "why this lean"
+          both come from that week's official NFL injury report — the same practice-participation and
+          game-status designations teams file, not a tweet or an article characterizing them. Out and Doubtful
+          override the lean to <strong>Avoid</strong> outright, regardless of how good the matchup looks — the
+          matchup score is still shown, just not allowed to say "start" for someone very unlikely to play.
+          Questionable is treated as a real but partial penalty rather than a hard override, since most
+          Questionable tags do end up playing.
+        </p>
+      </Card>
+
+      <Card className="p-6">
+        <SectionLabel>Usage trend ("is this player's role changing")</SectionLabel>
+        <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          The ↑/↓ next to a player's matchup, and the matching "usage trend" line in the breakdown, compares
+          their offensive snap share over the last 3 games to their season average. It's the best free,
+          structured stand-in for "is a coach quietly giving this player more or fewer touches" — a real shift in
+          role shows up here directly, without needing to interpret anyone's words. It only appears once a player
+          has at least 3 games on the books (too little data before that to call anything a trend), and like any
+          proxy it can be noisy — a blowout that pulled starters early looks the same as a real change. Read it as
+          a data point, not a verdict.
+        </p>
+      </Card>
+
+      <Card className="p-6">
+        <SectionLabel>Why there's no Twitter, ESPN, or Yahoo "insider" news here</SectionLabel>
+        <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          This was asked for directly, and it's worth being straightforward about why it isn't in here: there's
+          no free, structured, machine-readable feed of "what a beat reporter tweeted" or "what a coach said in a
+          press conference." Reading that kind of information at all means either paying for API access (X's
+          API is no longer free at any meaningful volume) or scraping sites whose terms of service generally
+          prohibit it (ESPN, Yahoo) — and even with access to the raw text, turning "Coach says rookie will see
+          more third-down work" into a number this app could use means an ongoing per-article AI reading job, not
+          a one-time build. That's a real, buildable feature, but it's a fundamentally different, ongoing-cost
+          piece of infrastructure (an API key, a paid model budget) than everything else on this page, which all
+          runs for free. Injury status and usage trend above are the two structured, free proxies that cover most
+          of the same ground — official designations for "is this player playing," snap-share trend for "is
+          their role changing" — without needing anyone's commentary interpreted.
         </p>
       </Card>
 

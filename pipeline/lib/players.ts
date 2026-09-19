@@ -148,15 +148,16 @@ export interface SnapLeader {
 export async function getTopSnapPlayers(
   team: string,
   season: number,
-  position: string,
+  position: string | string[],
   snapField: 'offense_snaps' | 'defense_snaps',
   topN: number,
 ): Promise<SnapLeader[]> {
+  const wanted = new Set(Array.isArray(position) ? position : [position]);
   const { rows } = await Datasets.snapCounts(season);
   const byPlayer = new Map<string, SnapLeader>();
   for (const row of rows) {
     if (normalizeTeam(row.team) !== normalizeTeam(team)) continue;
-    if (row.position !== position) continue;
+    if (!wanted.has(row.position)) continue;
     if (!row.pfr_player_id) continue;
     const snaps = Number(row[snapField]) || 0;
     const entry = byPlayer.get(row.pfr_player_id) ?? {

@@ -1,10 +1,11 @@
 # Fourth Quarter — Start/Sit Matchup Analyzer
 
-A weekly fantasy football start/sit tool for your own lineup. Add your WRs and
-RBs and it pulls their real matchup for the week — opponent history, defensive
-tendencies, and (for WR/RB specifically, per how this was scoped) the coverage
-and pass-rush detail below — and shows a transparent lean with every number
-that went into it. It never collapses that down to a single unexplained score.
+A weekly fantasy football start/sit tool for your own lineup. Add your WR,
+RB, QB, and TE and it pulls their real matchup for the week — opponent
+history, defensive tendencies, position-specific coverage/pass-rush detail,
+current injury status, and a usage trend — and shows a transparent lean
+with every number that went into it. It never collapses that down to a
+single unexplained score.
 
 ## What it actually checks
 
@@ -25,11 +26,32 @@ that went into it. It never collapses that down to a single unexplained score.
   (pressures/hurries/hits/sacks), including their rate specifically in games
   against offensive lines rated the same tier as this matchup.
 
-Every one of those is a real, live, computed number — never a guess dressed
-up as one. Where the ideal data isn't publicly available for free (true
-per-play coverage assignments, per-lineman pass-block grades), the app uses
-the closest honest substitute and says so explicitly, both in the app's
-**Methodology** tab and below.
+**For a QB:**
+- Own career history against this opponent, and the opponent's pass defense
+  allowed to QBs (fantasy points, pass yards/TDs) this season and last.
+- This QB's own offensive line pass-block quality, and the opponent's
+  individual pass rushers' production — the pressure this QB faces directly.
+
+**For a TE:**
+- The same own-history and pass-defense-allowed-to-TE splits as a WR gets,
+  plus the starting QB's history vs this defense.
+- Coverage stats for the opponent's most-used linebackers and safeties
+  instead of cornerbacks — TEs are covered by a different position group,
+  so this uses the group actually responsible for them.
+
+**For every position:**
+- Current injury status (Out/Doubtful/Questionable) from the NFL's own
+  weekly injury report — Out/Doubtful override the lean to Avoid outright.
+- A usage trend: offensive snap share over the last 3 games vs. the season
+  average, the best free structured proxy for "is this player's role
+  quietly changing."
+
+Every one of those is a real, computed number from structured data — never
+a guess dressed up as one. Where the ideal data isn't publicly available
+for free at all (true per-play coverage assignments, per-lineman pass-block
+grades, or a "coach hinted at a role change" signal from news/social media),
+the app either uses the closest honest structured substitute and says so,
+or says plainly that it isn't included and why — see Methodology.
 
 ## Running it
 
@@ -89,8 +111,8 @@ instead — see below.
 ### Importing a roster from Sleeper
 
 The dashboard can pull a roster straight from Sleeper by username: enter
-it, pick which of that account's leagues, and it adds every WR/RB on that
-team. This calls Sleeper's public API directly from the browser (no
+it, pick which of that account's leagues, and it adds every WR/RB/QB/TE on
+that team. This calls Sleeper's public API directly from the browser (no
 login, no cookies, no server) and matches players back to this site's own
 data via a small ID crosswalk built at data-generation time
 (`pipeline/lib/sleeper.ts`) — Sleeper's own multi-thousand-player dump
@@ -112,8 +134,10 @@ src/                    React 18 + TypeScript + Vite + Tailwind client
 pipeline/
   lib/                     nflverse data fetch+cache, CSV parsing, player search/ID crosswalks
   lib/sleeper.ts            builds the Sleeper-id → gsis-id crosswalk (public/data/sleeper-index.json)
-  matchup/                  one module per signal (coverage, pass rush, O-line tier, opponent-allowed,
-                             career history, coordinators) + util.ts's transparent percentile/composite scoring
+  matchup/                  wr.ts / rb.ts / qb.ts / te.ts — one analyzer per position, built from shared
+                             signal modules (coverage, pass rush, O-line tier, opponent-allowed, career
+                             history, coordinators, injury.ts, usageTrend.ts) + util.ts's transparent
+                             percentile/composite scoring
   generate-data.ts           writes public/data/{meta,players,sleeper-index}.json + public/data/matchups/<gsisId>.json
   config/coordinators.json    the defensive-coordinator list described below
 .github/workflows/deploy.yml  generate-data + build + deploy to GitHub Pages, on push/schedule/manual trigger
@@ -126,6 +150,9 @@ pipeline/
   community-maintained NFL data project released under **CC-BY 4.0**.
 - Cornerback coverage and pass-rush stats come from **Pro Football
   Reference's** advanced stats, redistributed via nflverse.
+- Injury status comes from the NFL's own official weekly injury report
+  (practice participation and game status), via nflverse — not a news feed
+  or social media.
 - League/roster import uses [Sleeper's](https://docs.sleeper.com/) public
   read API.
 - This project is not affiliated with the NFL, ESPN, PFF, Pro Football
@@ -194,16 +221,29 @@ falling back to the depth chart only before Week 1 snap data exists.
 
 ## Known limitations
 
-- WR and RB only — search doesn't return QBs, TEs, or any other position,
-  since the request this was built for was specifically about receivers and
-  backs and there's nothing precomputed for them to show.
+- No Twitter, ESPN, or Yahoo "insider" commentary — there's no free,
+  structured, machine-readable feed of what a beat reporter tweeted or what
+  a coach said in a press conference, and turning that kind of text into a
+  usable number would be an ongoing per-article AI-reading job, not a
+  one-time build (see Methodology). Injury status and usage trend below are
+  the two free, structured proxies that cover most of the same ground.
+- Injury status reflects that week's official NFL report as of the last
+  `generate-data` run, not a live feed — a status upgraded or downgraded
+  since then won't show until the next scheduled regeneration. Out/Doubtful
+  override the lean to Avoid outright; Questionable is a partial penalty
+  rather than a hard override, since most Questionable tags do end up
+  playing.
+- Usage trend (snap share over the last 3 games vs. the season average) is
+  a proxy for role change, not a report of one — it can be noisy (a blowout
+  that pulled starters early looks the same as a real change), and it needs
+  at least 3 games on the books before it appears at all.
 - Static snapshot, not live: a player is only searchable if they were on an
   active roster the last time `generate-data` ran, and their matchup is
   fixed to whatever their opponent was that same week. A trade, signing, or
   bye-week rollover won't show up until the next scheduled regeneration.
   Sleeper import fetches your actual roster live, but can still only add
-  the WR/RB on it that match this same precomputed snapshot — everything
-  else on your Sleeper team (QB, TE, K, DEF, or a genuinely unmatched
+  the WR/RB/QB/TE on it that match this same precomputed snapshot —
+  everything else on your Sleeper team (K, DEF, or a genuinely unmatched
   player) is silently skipped, with a count shown after import.
 - The Sleeper integration itself is unverified end to end (see
   "Importing a roster from Sleeper" above) — it's built from Sleeper's

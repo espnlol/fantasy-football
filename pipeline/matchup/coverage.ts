@@ -77,12 +77,29 @@ export async function coverageStatsForTeam(defTeam: string, season: number): Pro
  * (e.g. before week 1).
  */
 export async function startingCornerbackCoverage(defTeam: string, season: number): Promise<CoverageSummary[]> {
+  return mostUsedDefendersCoverage(defTeam, season, 'CB', 3);
+}
+
+/**
+ * A tight end is far more often covered by a linebacker or safety than a boundary corner — this is the same
+ * approach as startingCornerbackCoverage, just aimed at the position group actually responsible for TEs.
+ */
+export async function topLinebackerSafetyCoverage(defTeam: string, season: number): Promise<CoverageSummary[]> {
+  return mostUsedDefendersCoverage(defTeam, season, ['LB', 'S'], 3);
+}
+
+async function mostUsedDefendersCoverage(
+  defTeam: string,
+  season: number,
+  positions: string | string[],
+  topN: number,
+): Promise<CoverageSummary[]> {
   const [allCoverage, snapLeaders] = await Promise.all([
     coverageStatsForTeam(defTeam, season),
-    getTopSnapPlayers(defTeam, season, 'CB', 'defense_snaps', 3),
+    getTopSnapPlayers(defTeam, season, positions, 'defense_snaps', topN),
   ]);
 
   const leaderIds = new Set(snapLeaders.map((s) => s.pfrPlayerId));
   const filtered = allCoverage.filter((c) => leaderIds.has(c.pfrPlayerId));
-  return filtered.length > 0 ? filtered : allCoverage.slice(0, 3);
+  return filtered.length > 0 ? filtered : allCoverage.slice(0, topN);
 }

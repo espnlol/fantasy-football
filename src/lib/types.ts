@@ -62,6 +62,11 @@ export interface AllowedSplit {
     carries: number;
     rushYards: number;
     rushTd: number;
+    completions: number;
+    passAttempts: number;
+    passYards: number;
+    passTd: number;
+    interceptions: number;
     pprPoints: number;
   };
   percentileAgainstPosition: number;
@@ -134,6 +139,21 @@ export interface DcInfo {
   confidence: string;
 }
 
+export interface InjuryStatus {
+  status: string;
+  primaryInjury: string | null;
+  practiceStatus: string | null;
+  asOfWeek: number;
+}
+
+export interface UsageTrend {
+  seasonAvgSnapPct: number;
+  recentAvgSnapPct: number;
+  recentGames: number;
+  totalGames: number;
+  trend: 'up' | 'down' | 'stable';
+}
+
 interface MatchupBase {
   player: PlayerCandidate;
   opponent: string;
@@ -141,15 +161,17 @@ interface MatchupBase {
   week: number;
   homeAway: 'home' | 'away';
   ownHistoryVsOpponent: { summary: HistorySummary; games: GameLine[] };
-  qb: QbSection | null;
   defensiveCoordinator: DcInfo;
   recommendation: CompositeResult;
+  injuryStatus: InjuryStatus | null;
+  usageTrend: UsageTrend | null;
 }
 
 export interface WrMatchup extends MatchupBase {
   position: 'WR';
   opponentPassDefenseAllowedToWr: { thisSeason: AllowedSplit | null; lastSeason: AllowedSplit | null; recentForm: RecentForm | null };
   opponentCornerbacks: CoverageSummary[];
+  qb: QbSection | null;
 }
 
 export interface RbMatchup extends MatchupBase {
@@ -157,6 +179,21 @@ export interface RbMatchup extends MatchupBase {
   opponentRunDefenseAllowedToRb: { thisSeason: AllowedSplit | null; lastSeason: AllowedSplit | null; recentForm: RecentForm | null };
   myOline: { thisSeason: OlineTier | null; lastSeason: OlineTier | null };
   opponentPassRush: { topRushers: PassRusherSummary[]; rushersVsMyTier: RusherVsMyTier[] };
+  qb: QbSection | null;
+}
+
+export interface QbMatchup extends MatchupBase {
+  position: 'QB';
+  opponentPassDefenseAllowedToQb: { thisSeason: AllowedSplit | null; lastSeason: AllowedSplit | null; recentForm: RecentForm | null };
+  myOline: { thisSeason: OlineTier | null; lastSeason: OlineTier | null };
+  opponentPassRush: { topRushers: PassRusherSummary[]; rushersVsMyTier: RusherVsMyTier[] };
+}
+
+export interface TeMatchup extends MatchupBase {
+  position: 'TE';
+  opponentPassDefenseAllowedToTe: { thisSeason: AllowedSplit | null; lastSeason: AllowedSplit | null; recentForm: RecentForm | null };
+  opponentCoverageDefenders: CoverageSummary[];
+  qb: QbSection | null;
 }
 
 export interface ByeResult {
@@ -166,7 +203,7 @@ export interface ByeResult {
   bye: true;
 }
 
-export type MatchupResult = WrMatchup | RbMatchup | ByeResult;
+export type MatchupResult = WrMatchup | RbMatchup | QbMatchup | TeMatchup | ByeResult;
 
 export interface MetaResponse {
   season: number;

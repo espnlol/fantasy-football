@@ -6,15 +6,57 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { CsvRow } from './lib/csv';
 import { Datasets, currentSeason, currentWeek, opponentFor } from './lib/datasets';
-import { listRosterPlayers } from './lib/players';
+import { listRosterPlayers, PlayerCandidate } from './lib/players';
 import { buildSleeperCrosswalk } from './lib/sleeper';
 import { analyzeWr } from './matchup/wr';
 import { analyzeRb } from './matchup/rb';
+import { analyzeQb } from './matchup/qb';
+import { analyzeTe } from './matchup/te';
+import { getInjuryStatus, applyInjuryToResult } from './matchup/injury';
+import { getUsageTrend, usageTrendComponent } from './matchup/usageTrend';
+import { addComponent } from './matchup/util';
 import { coordinatorsMeta } from './matchup/coordinators';
 
 const OUT_DIR = path.join(__dirname, '..', 'public', 'data');
 const MATCHUPS_DIR = path.join(OUT_DIR, 'matchups');
+const TRACKED_POSITIONS = ['WR', 'RB', 'QB', 'TE'];
+
+async function buildPayload(player: PlayerCandidate, games: CsvRow[], season: number, week: number) {
+  const opp = opponentFor(games, season, week, player.team);
+  if (!opp) return { payload: { player, season, week, bye: true }, isBye: true };
+
+  const base =
+    player.position === 'WR'
+      ? { position: 'WR' as const, report: await analyzeWr(player.gsisId, player.name, player.team, opp.opponent, season, week) }
+      : player.position === 'RB'
+        ? { position: 'RB' as const, report: await analyzeRb(player.gsisId, player.name, player.team, opp.opponent, season, week) }
+        : player.position === 'QB'
+          ? { position: 'QB' as const, report: await analyzeQb(player.gsisId, player.name, player.team, opp.opponent, season, week) }
+          : { position: 'TE' as const, report: await analyzeTe(player.gsisId, player.name, player.team, opp.opponent, season, week) };
+
+  const injury = await getInjuryStatus(player.gsisId, season, week);
+  let recommendation = applyInjuryToResult(base.report.recommendation, injury);
+
+  // Snap-share trend is a role-change proxy; a starting QB's snap share barely moves outside of a benching (which
+  // the injury report / a QB2 taking over roster spot would already surface), so it isn't worth computing there.
+  const usageTrend = base.position === 'QB' ? null : await getUsageTrend(player.gsisId, player.team, season);
+  if (usageTrend) recommendation = addComponent(recommendation, usageTrendComponent(usageTrend));
+
+  return {
+    payload: {
+      position: base.position,
+      homeAway: opp.homeAway,
+      player,
+      ...base.report,
+      recommendation,
+      injuryStatus: injury,
+      usageTrend,
+    },
+    isBye: false,
+  };
+}
 
 async function main(): Promise<void> {
   const season = currentSeason();
@@ -24,8 +66,8 @@ async function main(): Promise<void> {
 
   fs.mkdirSync(MATCHUPS_DIR, { recursive: true });
 
-  const players = await listRosterPlayers(season, ['WR', 'RB']);
-  console.log(`${players.length} WR/RB on current active rosters.`);
+  const players = await listRosterPlayers(season, TRACKED_POSITIONS);
+  console.log(`${players.length} ${TRACKED_POSITIONS.join('/')} on current active rosters.`);
 
   fs.writeFileSync(path.join(OUT_DIR, 'players.json'), JSON.stringify(players));
 
@@ -38,20 +80,9 @@ async function main(): Promise<void> {
   for (const [i, player] of players.entries()) {
     process.stdout.write(`\r[${i + 1}/${players.length}] ${player.name.padEnd(28)}`);
     try {
-      const opp = opponentFor(games, season, week, player.team);
-      let payload: unknown;
-      if (!opp) {
-        payload = { player, season, week, bye: true };
-        byes++;
-      } else if (player.position === 'WR') {
-        const report = await analyzeWr(player.gsisId, player.name, player.team, opp.opponent, season, week);
-        payload = { position: 'WR', homeAway: opp.homeAway, player, ...report };
-        ok++;
-      } else {
-        const report = await analyzeRb(player.gsisId, player.name, player.team, opp.opponent, season, week);
-        payload = { position: 'RB', homeAway: opp.homeAway, player, ...report };
-        ok++;
-      }
+      const { payload, isBye } = await buildPayload(player, games, season, week);
+      if (isBye) byes++;
+      else ok++;
       fs.writeFileSync(path.join(MATCHUPS_DIR, `${player.gsisId}.json`), JSON.stringify(payload));
     } catch (err) {
       failed++;

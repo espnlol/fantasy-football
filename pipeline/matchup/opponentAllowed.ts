@@ -3,6 +3,8 @@ import { num } from '../lib/csv';
 import { normalizeTeam } from '../lib/teams';
 import { percentileRank, tierFromPercentile, Tier } from './util';
 
+export type TrackedPosition = 'WR' | 'RB' | 'QB' | 'TE';
+
 export interface AllowedSplit {
   team: string;
   season: number;
@@ -15,6 +17,11 @@ export interface AllowedSplit {
     carries: number;
     rushYards: number;
     rushTd: number;
+    completions: number;
+    passAttempts: number;
+    passYards: number;
+    passTd: number;
+    interceptions: number;
     pprPoints: number;
   };
   /** Higher = this defense allows MORE fantasy production to the position (a more favorable matchup). */
@@ -28,7 +35,7 @@ function round1(n: number): number {
 
 let allowedCache = new Map<string, Map<string, AllowedSplit>>();
 
-export async function allowedSplitsForSeason(season: number, position: 'WR' | 'RB'): Promise<Map<string, AllowedSplit>> {
+export async function allowedSplitsForSeason(season: number, position: TrackedPosition): Promise<Map<string, AllowedSplit>> {
   const cacheKey = `${season}|${position}`;
   const cached = allowedCache.get(cacheKey);
   if (cached) return cached;
@@ -41,7 +48,21 @@ export async function allowedSplitsForSeason(season: number, position: 'WR' | 'R
     const opp = normalizeTeam(row.opponent_team);
     const entry = byTeam.get(opp) ?? {
       games: new Set<string>(),
-      totals: { receptions: 0, targets: 0, recYards: 0, recTd: 0, carries: 0, rushYards: 0, rushTd: 0, pprPoints: 0 },
+      totals: {
+        receptions: 0,
+        targets: 0,
+        recYards: 0,
+        recTd: 0,
+        carries: 0,
+        rushYards: 0,
+        rushTd: 0,
+        completions: 0,
+        passAttempts: 0,
+        passYards: 0,
+        passTd: 0,
+        interceptions: 0,
+        pprPoints: 0,
+      },
     };
     entry.games.add(`${row.season}-${row.week}`);
     entry.totals.receptions += num(row, 'receptions') ?? 0;
@@ -51,6 +72,11 @@ export async function allowedSplitsForSeason(season: number, position: 'WR' | 'R
     entry.totals.carries += num(row, 'carries') ?? 0;
     entry.totals.rushYards += num(row, 'rushing_yards') ?? 0;
     entry.totals.rushTd += num(row, 'rushing_tds') ?? 0;
+    entry.totals.completions += num(row, 'completions') ?? 0;
+    entry.totals.passAttempts += num(row, 'attempts') ?? 0;
+    entry.totals.passYards += num(row, 'passing_yards') ?? 0;
+    entry.totals.passTd += num(row, 'passing_tds') ?? 0;
+    entry.totals.interceptions += num(row, 'interceptions') ?? 0;
     entry.totals.pprPoints += num(row, 'fantasy_points_ppr') ?? 0;
     byTeam.set(opp, entry);
   }
@@ -79,6 +105,11 @@ export async function allowedSplitsForSeason(season: number, position: 'WR' | 'R
         carries: round1(v.totals.carries / g),
         rushYards: round1(v.totals.rushYards / g),
         rushTd: round1(v.totals.rushTd / g),
+        completions: round1(v.totals.completions / g),
+        passAttempts: round1(v.totals.passAttempts / g),
+        passYards: round1(v.totals.passYards / g),
+        passTd: round1(v.totals.passTd / g),
+        interceptions: round1(v.totals.interceptions / g),
         pprPoints: round1(ppg),
       },
       percentileAgainstPosition: Math.round(pct * 10) / 10,
@@ -89,7 +120,7 @@ export async function allowedSplitsForSeason(season: number, position: 'WR' | 'R
   return result;
 }
 
-export async function allowedSplitForTeam(team: string, season: number, position: 'WR' | 'RB'): Promise<AllowedSplit | null> {
+export async function allowedSplitForTeam(team: string, season: number, position: TrackedPosition): Promise<AllowedSplit | null> {
   const map = await allowedSplitsForSeason(season, position);
   return map.get(normalizeTeam(team)) ?? null;
 }
@@ -97,7 +128,7 @@ export async function allowedSplitForTeam(team: string, season: number, position
 export async function recentAllowed(
   team: string,
   season: number,
-  position: 'WR' | 'RB',
+  position: TrackedPosition,
   lastN = 4,
 ): Promise<{ games: number; pprPointsPerGame: number } | null> {
   const { rows } = await Datasets.playerStats();

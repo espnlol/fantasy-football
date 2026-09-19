@@ -53,3 +53,9 @@ export function compositeLean(components: ScoreComponent[]): CompositeResult {
     totalWeight > 0 ? components.reduce((s, c) => s + c.percentile * c.weight, 0) / totalWeight : 50;
   return { lean: leanFromPercentile(score), score: Math.round(score * 10) / 10, components };
 }
+
+/** Folds one more component into an already-computed result and recomputes the weighted score/lean from scratch. */
+export function addComponent(result: CompositeResult, extra: ScoreComponent | null, prepend = false): CompositeResult {
+  if (!extra) return result;
+  return compositeLean(prepend ? [extra, ...result.components] : [...result.components, extra]);
+}
