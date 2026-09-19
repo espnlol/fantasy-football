@@ -41,6 +41,10 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          # Pages has never been turned on for this repo; without this the action only reads the existing
+          # config (404s) instead of creating it. Needs nothing beyond the pages: write permission above.
+          enablement: true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
