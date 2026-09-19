@@ -1,0 +1,41 @@
+{
+  "meta": {
+    "asOf": "2026-09-18",
+    "confidence": "unverified",
+    "note": "Best-effort, web-search-assisted list of each team's 2026 defensive coordinator. It has NOT been checked against a primary source (Wikipedia and team-site fetches were both blocked by this environment's network policy while this was built) and the search summaries used to build it contained at least two internal contradictions, which were dropped rather than guessed at. Coordinators also get fired mid-season. Treat every name here as unverified, fix any you know to be wrong from Settings, and leave a team null rather than guess — the app falls back to plain team-level history for any team left blank."
+  },
+  "defensiveCoordinators": {
+    "ARI": null,
+    "ATL": "Jeff Ulbrich",
+    "BAL": "Anthony Weaver",
+    "BUF": "Jim Leonhard",
+    "CAR": "Ejiro Evero",
+    "CHI": "Dennis Allen",
+    "CIN": "Al Golden",
+    "CLE": "Mike Rutenberg",
+    "DAL": "Christian Parker",
+    "DEN": "Vance Joseph",
+    "DET": "Kelvin Sheppard",
+    "GB": "Jonathan Gannon",
+    "HOU": "Matt Burke",
+    "IND": "Lou Anarumo",
+    "JAX": "Anthony Campanile",
+    "KC": "Steve Spagnuolo",
+    "LA": "Chris Shula",
+    "LAC": "Chris O'Leary",
+    "LV": "Rob Leonard",
+    "MIA": "Sean Duggan",
+    "MIN": "Brian Flores",
+    "NE": "Zak Kuhr",
+    "NO": null,
+    "NYG": "Dennard Wilson",
+    "NYJ": "Brian Duker",
+    "PHI": "Vic Fangio",
+    "PIT": "Patrick Graham",
+    "SEA": null,
+    "SF": null,
+    "TB": null,
+    "TEN": "Gus Bradley",
+    "WAS": "Daronte Jones"
+  }
+}

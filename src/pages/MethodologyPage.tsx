@@ -1,0 +1,110 @@
+import type { MetaResponse } from '../lib/types';
+import { Card, SectionLabel } from '../components/ui';
+
+export function MethodologyPage({ meta }: { meta: MetaResponse | null }) {
+  return (
+    <div className="space-y-6">
+      <Card className="p-6">
+        <h2 className="mb-2 text-lg font-semibold text-slate-900 dark:text-slate-50">What this is, and isn't</h2>
+        <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          This tool ranks start/sit decisions using real season and career statistics from public NFL data — not a
+          proprietary rating service. Every recommendation shows its component numbers so you can judge them
+          yourself rather than trust a single opaque score. Where the ideal data doesn't exist for free (see below),
+          this uses the closest honest substitute and says so, rather than making something up.
+        </p>
+      </Card>
+
+      <Card className="p-6">
+        <SectionLabel>Data sources</SectionLabel>
+        <ul className="list-disc space-y-1.5 pl-5 text-sm text-slate-600 dark:text-slate-300">
+          <li>
+            Play-by-play, rosters, snap counts, depth charts, and schedules from{' '}
+            <a
+              href="https://github.com/nflverse/nflverse-data"
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium text-field-700 underline dark:text-field-400"
+            >
+              nflverse
+            </a>{' '}
+            — an open, community-maintained NFL data project, licensed CC-BY 4.0. Every weekly box score you see
+            here (targets, yards, receptions, fantasy points) is computed from play-by-play directly, because
+            nflverse's own precomputed "player_stats" convenience file has been frozen since May 2025 and never
+            updated for the current season.
+          </li>
+          <li>
+            Cornerback coverage and pass-rush stats (targets allowed, completion% allowed, pressures, hurries,
+            hits, sacks) come from Pro Football Reference's advanced stats, via nflverse.
+          </li>
+          <li>
+            Fantasy points are standard full-PPR, computed from the box score. Your league's actual scoring (0.5
+            PPR, TE premium, return TDs, bonus thresholds) may differ slightly.
+          </li>
+        </ul>
+      </Card>
+
+      <Card className="p-6">
+        <SectionLabel>Cornerback matchups</SectionLabel>
+        <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          There is no free, public data on which specific defender covered which specific receiver on a given
+          play — that's the kind of all-22 charting PFF and NFL Next Gen Stats sell, not something available via
+          open data. What this shows instead is each cornerback's own season-long coverage performance
+          (targets, completion% allowed, yards per target, passer rating allowed), for the corners who've actually
+          played the most defensive snaps at the position this season. Treat it as "how good has this corner been
+          in coverage," not "this corner will be on this receiver."
+        </p>
+      </Card>
+
+      <Card className="p-6">
+        <SectionLabel>Offensive line vs. pass rush</SectionLabel>
+        <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          Per-lineman pass-block grades are PFF's paywalled product — there's no free equivalent. As the best
+          available substitute, an offense's O-line quality is proxied by how often its own quarterback(s) have
+          been pressured this season (from PFR's pressure stats): a lower pressure rate implies better protection.
+          This is a whole-offense number, not a per-player grade, and it's affected by more than the offensive
+          line alone (scheme, quarterback mobility, play calling). Opposing pass rushers are shown individually
+          (their real pressures/hurries/hits/sacks), along with their pressure rate specifically in games against
+          offensive lines that graded out in the same tier as the matchup you're looking at.
+        </p>
+      </Card>
+
+      <Card className="p-6">
+        <SectionLabel>Defensive coordinators</SectionLabel>
+        <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          Each opponent's current defensive coordinator is shown for context next to the quarterback's history
+          against that defense. This list was built from web search rather than a structured, verifiable feed —
+          Wikipedia and team sites were both unreachable from the environment this was built in — and it has{' '}
+          <strong>not</strong> been checked against a primary source. Two entries were dropped outright because
+          the sources contradicted each other. Coordinators also get fired mid-season. Confirm any name you're
+          relying on, and treat a blank team as "not verified" rather than "no coordinator."
+        </p>
+        {meta?.coordinators && (
+          <p className="mt-2 text-xs text-slate-400">
+            List last assembled {meta.coordinators.asOf}, confidence: {meta.coordinators.confidence}.
+          </p>
+        )}
+      </Card>
+
+      <Card className="p-6">
+        <SectionLabel>ESPN league import</SectionLabel>
+        <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          Importing your roster from ESPN calls ESPN's own (undocumented) fantasy API from this app's server, so a
+          private league's cookies never reach your browser's network tab. That call could not be tested against a
+          real league while building this, because this environment's network policy blocks espn.com outright. It
+          follows the request shape the fantasy-tooling community has reverse-engineered over the years, but
+          verify it works for your league before relying on it — manual search is always available as a fallback
+          and is the better-tested path.
+        </p>
+      </Card>
+
+      <Card className="p-6">
+        <SectionLabel>Small samples early in the season</SectionLabel>
+        <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          Every "this season" stat shows its game count (n=). Early in the year that number can be 1 or 2 games —
+          treat those as noisy, and lean more on the "last season" figures shown alongside them until the sample
+          grows.
+        </p>
+      </Card>
+    </div>
+  );
+}
