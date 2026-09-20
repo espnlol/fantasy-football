@@ -53,6 +53,20 @@ grades, or a "coach hinted at a role change" signal from news/social media),
 the app either uses the closest honest structured substitute and says so,
 or says plainly that it isn't included and why — see Methodology.
 
+## Comparing two players
+
+Check the "Compare" box on any two players in your roster and their full
+breakdowns render side by side, with a plain-language summary line above
+them (an injury override, a near-even call, or which one scored higher and
+by how much). It's the same per-player lean and score already shown on
+each card — comparing just puts both sets of numbers next to each other
+instead of making you scroll between two cards. Comparing across positions
+(say, a flex call between a WR and a TE) works the same way, but with a
+visible caveat: each position's score is built from that position's own
+signals, so it's a rougher read than comparing two players at the same
+position. Unchecking either box, removing a player, or hitting "Clear
+comparison" drops the panel.
+
 ## Running it
 
 This is a fully static site — a precompute step writes plain JSON files, and
@@ -237,6 +251,11 @@ falling back to the depth chart only before Week 1 snap data exists.
   a proxy for role change, not a report of one — it can be noisy (a blowout
   that pulled starters early looks the same as a real change), and it needs
   at least 3 games on the books before it appears at all.
+- Comparing two players just places their existing scores side by side —
+  it doesn't add a second model on top. Comparing across positions is
+  weaker than same-position comparisons, since the score is a weighted
+  average of different signals for a QB than for a WR; the panel flags this
+  when it applies, but the number itself isn't adjusted for it.
 - Static snapshot, not live: a player is only searchable if they were on an
   active roster the last time `generate-data` ran, and their matchup is
   fixed to whatever their opponent was that same week. A trade, signing, or

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import type {
   GameLine,
@@ -75,7 +75,7 @@ function initials(name: string): string {
     .join('');
 }
 
-function PlayerAvatar({ player }: { player: PlayerCandidate }) {
+export function PlayerAvatar({ player }: { player: PlayerCandidate }) {
   const [failed, setFailed] = useState(false);
   if (!player.headshot || failed) {
     return (
@@ -100,7 +100,7 @@ const INJURY_STYLES: Record<string, string> = {
   Questionable: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/30 dark:border-amber-800 dark:text-amber-200',
 };
 
-function InjuryBanner({ injury }: { injury: InjuryStatus | null }) {
+export function InjuryBanner({ injury }: { injury: InjuryStatus | null }) {
   if (!injury || injury.status === 'Healthy') return null;
   return (
     <div className={`rounded-lg border px-3 py-2 text-sm font-medium ${INJURY_STYLES[injury.status] ?? INJURY_STYLES.Questionable}`}>
@@ -111,7 +111,7 @@ function InjuryBanner({ injury }: { injury: InjuryStatus | null }) {
   );
 }
 
-function UsageTrendTag({ trend }: { trend: UsageTrend | null }) {
+export function UsageTrendTag({ trend }: { trend: UsageTrend | null }) {
   if (!trend || trend.totalGames < 3) return null;
   const arrow = trend.trend === 'up' ? '↑' : trend.trend === 'down' ? '↓' : '→';
   const color =
@@ -130,11 +130,33 @@ function UsageTrendTag({ trend }: { trend: UsageTrend | null }) {
   );
 }
 
-export function MatchupCard({ player, onRemove }: { player: PlayerCandidate; onRemove: () => void }) {
+export type MatchupResultEvent = { data: MatchupResult } | { error: string };
+
+export interface CompareToggleProps {
+  checked: boolean;
+  disabled: boolean;
+  onToggle: () => void;
+}
+
+export function MatchupCard({
+  player,
+  onRemove,
+  onResult,
+  compare,
+}: {
+  player: PlayerCandidate;
+  onRemove: () => void;
+  onResult?: (gsisId: string, result: MatchupResultEvent) => void;
+  compare?: CompareToggleProps;
+}) {
   const [data, setData] = useState<MatchupResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
+  const onResultRef = useRef(onResult);
+  useEffect(() => {
+    onResultRef.current = onResult;
+  }, [onResult]);
 
   useEffect(() => {
     let cancelled = false;
@@ -144,10 +166,14 @@ export function MatchupCard({ player, onRemove }: { player: PlayerCandidate; onR
     api
       .matchup(player.gsisId)
       .then((res) => {
-        if (!cancelled) setData(res);
+        if (cancelled) return;
+        setData(res);
+        onResultRef.current?.(player.gsisId, { data: res });
       })
       .catch((err) => {
-        if (!cancelled) setError(err.message);
+        if (cancelled) return;
+        setError(err.message);
+        onResultRef.current?.(player.gsisId, { error: err.message });
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -175,9 +201,30 @@ export function MatchupCard({ player, onRemove }: { player: PlayerCandidate; onR
             <p className="text-sm text-slate-500">{player.team}</p>
           </div>
         </div>
-        <button onClick={onRemove} className="shrink-0 text-xs text-slate-400 hover:text-red-500">
-          Remove
-        </button>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          {compare && (
+            <label
+              title={compare.disabled ? 'Uncheck a player below to compare a different pair' : undefined}
+              className={`flex items-center gap-1.5 text-xs ${
+                compare.disabled
+                  ? 'cursor-not-allowed text-slate-300 dark:text-slate-700'
+                  : 'cursor-pointer text-slate-500 dark:text-slate-400'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={compare.checked}
+                disabled={compare.disabled}
+                onChange={compare.onToggle}
+                className="h-3.5 w-3.5 rounded border-slate-300 text-field-600 focus:ring-field-500 disabled:opacity-40 dark:border-slate-700"
+              />
+              Compare
+            </label>
+          )}
+          <button onClick={onRemove} className="text-xs text-slate-400 hover:text-red-500">
+            Remove
+          </button>
+        </div>
       </div>
 
       <div className="mt-4">
@@ -232,44 +279,52 @@ function MatchupBody({
       </button>
 
       {expanded && (
-        <div className="space-y-5 border-t border-slate-100 pt-4 dark:border-slate-800">
-          <div>
-            <SectionLabel>Why this lean</SectionLabel>
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {data.recommendation.components.map((c, i) => (
-                <ComponentRow key={i} c={c} />
-              ))}
-            </div>
-          </div>
+        <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
+          <MatchupDetails data={data} />
+        </div>
+      )}
+    </div>
+  );
+}
 
-          <div>
-            <SectionLabel>
-              {data.player.name} vs {data.opponent} — career
-            </SectionLabel>
-            <HistoryTable games={data.ownHistoryVsOpponent.games} />
-          </div>
+export function MatchupDetails({ data }: { data: WrMatchup | RbMatchup | QbMatchup | TeMatchup }) {
+  return (
+    <div className="space-y-5">
+      <div>
+        <SectionLabel>Why this lean</SectionLabel>
+        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          {data.recommendation.components.map((c, i) => (
+            <ComponentRow key={i} c={c} />
+          ))}
+        </div>
+      </div>
 
-          {data.position === 'WR' && <WrExtras data={data} />}
-          {data.position === 'RB' && <RbExtras data={data} />}
-          {data.position === 'QB' && <QbExtras data={data} />}
-          {data.position === 'TE' && <TeExtras data={data} />}
+      <div>
+        <SectionLabel>
+          {data.player.name} vs {data.opponent} — career
+        </SectionLabel>
+        <HistoryTable games={data.ownHistoryVsOpponent.games} />
+      </div>
 
-          {data.position !== 'QB' && data.qb && (
-            <div>
-              <SectionLabel>
-                QB context — {data.qb.name} vs {data.opponent}
-              </SectionLabel>
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                {data.qb.vsThisDefense.games > 0
-                  ? `${data.qb.vsThisDefense.avgPpr} fantasy pts/gm across ${data.qb.vsThisDefense.games} career game(s) vs this defense.`
-                  : 'No career games against this defense yet.'}
-              </p>
-              {data.defensiveCoordinator.name && (
-                <p className="mt-0.5 text-xs text-slate-400">
-                  Current DC: {data.defensiveCoordinator.name} — unverified, see Methodology.
-                </p>
-              )}
-            </div>
+      {data.position === 'WR' && <WrExtras data={data} />}
+      {data.position === 'RB' && <RbExtras data={data} />}
+      {data.position === 'QB' && <QbExtras data={data} />}
+      {data.position === 'TE' && <TeExtras data={data} />}
+
+      {data.position !== 'QB' && data.qb && (
+        <div>
+          <SectionLabel>
+            QB context — {data.qb.name} vs {data.opponent}
+          </SectionLabel>
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            {data.qb.vsThisDefense.games > 0
+              ? `${data.qb.vsThisDefense.avgPpr} fantasy pts/gm across ${data.qb.vsThisDefense.games} career game(s) vs this defense.`
+              : 'No career games against this defense yet.'}
+          </p>
+          {data.defensiveCoordinator.name && (
+            <p className="mt-0.5 text-xs text-slate-400">
+              Current DC: {data.defensiveCoordinator.name} — unverified, see Methodology.
+            </p>
           )}
         </div>
       )}
